@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"strings"
 	"net/url"
-	"net/http"
 	"io"
 	"encoding/json"
+	"http_utils"
 )
 
+// GoogleUrlShortener provides the ability to shorten links to goo.gl links. 
+// It can also "unshorten" goo.gl links.
 type GoogleUrlShortener struct {
 	apiKey string
 }
@@ -28,31 +30,20 @@ func (g *GoogleUrlShortener) postUrl() string {
 	return fmt.Sprintf("%v%v", "https://www.googleapis.com/urlshortener/v1/url?key=", api_key)
 }
 
+// Shorten a url using Google's goo.gl service
 func (g * GoogleUrlShortener) ShortenedUrl(longUrl string) (string, error) {
 	if strings.HasPrefix(longUrl, "https://goo.gl") && strings.HasPrefix(longUrl, "http://goo.gl")  {
 		return "", errors.New("cannot shorten already shortened url")
 	}
 	
-	client := &http.Client{}
-	
-	
-	req, err := http.NewRequest("POST", g.postUrl(), strings.NewReader("{\"longUrl\": \"" + longUrl + "/\"}"))
-	// ...
-	req.Header.Add("Content-Type", "application/json")
-	resp, err := client.Do(req)
-	body_bytes:= resp.Body
-	
-	defer body_bytes.Close()
-	
-	var short_resp ShortenedResponse
-	decoder := json.NewDecoder(body_bytes)
-	err = decoder.Decode(&short_resp)
-	if err != nil && err != io.EOF {
-		return "", err
-	}
-	return short_resp.Id, err
+	body_reader := http_utils.Post(g.postUrl(), strings.NewReader("{\"longUrl\": \"" + longUrl + "/\"}"), "application/json")
+	defer body_reader.Close()
+
+	short_resp := deJsonifyShortenedResponse(body_reader)
+	return short_resp.Id, nil
 }
 
+// Expand a goo.gl link
 func (g *GoogleUrlShortener) ExpandedUrl(id string) (string, error) {
 	if !strings.HasPrefix(id, "https://goo.gl") && !strings.HasPrefix(id, "http://goo.gl")  {
 		return "", errors.New("cannot expand non shortened url")
@@ -62,37 +53,47 @@ func (g *GoogleUrlShortener) ExpandedUrl(id string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	
-	client := &http.Client{}
-	
-	req, err := http.NewRequest("GET", url.String(), nil)
-	// ...
-	req.Header.Add("Content-Type", "application/json")
-	resp, err := client.Do(req)
-	body_bytes:= resp.Body
-	
-	defer body_bytes.Close()
-	
-	var exp_resp ExpandResponse
-	decoder := json.NewDecoder(body_bytes)
-	err = decoder.Decode(&exp_resp)
-	if err != nil && err != io.EOF {
-		return "", err
-	}
-	return exp_resp.LongUrl, err
+	body_reader := http_utils.Get(url.String())
+	defer body_reader.Close()
+
+	exp_resp := deJsonifyExpendedResponse(body_reader)
+	return exp_resp.LongUrl, nil
 }
 
-type Response struct {
+func deJsonifyExpendedResponse(reader io.Reader) (expand_response) {
+	var r expand_response
+
+	decoder := json.NewDecoder(reader)
+	err := decoder.Decode(&r)
+	if err != nil && err != io.EOF {
+		panic(err)
+	}
+	return r
+}
+
+func deJsonifyShortenedResponse(reader io.Reader) (shortened_response) {
+	var r shortened_response
+
+	decoder := json.NewDecoder(reader)
+	err := decoder.Decode(&r)
+	if err != nil && err != io.EOF {
+		panic(err)
+	}
+	return r
+}
+
+type response struct {
 	Kind string `json:"kind"`
 	Id string `json:"id"`
 	LongUrl string `json:"longUrl"`
 }
 
-type ExpandResponse struct {
-	Response
+type expand_response struct {
+	response
 	Status string `json:"status"`
+
 }
 
-type ShortenedResponse struct {
-	Response
+type shortened_response struct {
+	response
 }

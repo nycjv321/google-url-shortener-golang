@@ -1,1 +1,1 @@
-Project to golang
+Project to learn golang
