@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"io"
 	"encoding/json"
-	"http_utils"
+	"httputils"
 )
 
 // GoogleUrlShortener provides the ability to shorten links to goo.gl links. 
@@ -36,7 +36,7 @@ func (g * GoogleUrlShortener) ShortenedUrl(longUrl string) (string, error) {
 		return "", errors.New("cannot shorten already shortened url")
 	}
 	
-	body_reader := http_utils.Post(g.postUrl(), strings.NewReader("{\"longUrl\": \"" + longUrl + "/\"}"), "application/json")
+	body_reader := httputils.Post(g.postUrl(), strings.NewReader("{\"longUrl\": \"" + longUrl + "/\"}"), "application/json")
 	defer body_reader.Close()
 
 	short_resp := deJsonifyShortenedResponse(body_reader)
@@ -53,7 +53,7 @@ func (g *GoogleUrlShortener) ExpandedUrl(id string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	body_reader := http_utils.Get(url.String())
+	body_reader := httputils.Get(url.String())
 	defer body_reader.Close()
 
 	exp_resp := deJsonifyExpendedResponse(body_reader)
